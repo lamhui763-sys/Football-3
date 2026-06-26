@@ -1532,12 +1532,29 @@ app.post("/api/match-forecast", async (req, res) => {
     
     // Auto-substitution pool
     const substitutionPool = [
+      { provider: "mistral", model: "mistral-large-latest" },
       { provider: "gemini", model: "gemini-1.5-pro" },
       { provider: "dashscope", model: "qwen-plus" },
       { provider: "zhipu", model: "glm-4-flash" }
     ];
 
-    const filteredPool = substitutionPool.filter(x => x.provider !== selectedProvider);
+    const hasGeminiKey = process.env.GEMINI_API_KEY && 
+                         process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" && 
+                         process.env.GEMINI_API_KEY.trim() !== "";
+
+    let filteredPool = substitutionPool.filter(x => x.provider !== selectedProvider);
+    if (!hasGeminiKey) {
+      filteredPool = filteredPool.filter(x => x.provider !== "gemini");
+    }
+
+    // Prioritize mistral specifically on Vercel deployment
+    if (isVercel) {
+      filteredPool.sort((a, b) => {
+        if (a.provider === "mistral") return -1;
+        if (b.provider === "mistral") return 1;
+        return 0;
+      });
+    }
 
     let substitutionSuccess = false;
     let fallbackSignature = "";
@@ -1562,6 +1579,25 @@ app.post("/api/match-forecast", async (req, res) => {
           ];
           substitutionSuccess = true;
           fallbackSignature = "Google Gemini";
+          break;
+        } else if (alt.provider === "mistral") {
+          const systemInstruction = SYSTEM_INSTRUCTION;
+          const userMessage = `【重要指令：原定 AI 智能體額度已用完，請緊急接管回答。填寫歷史與近況數據到 json 中的 \`historicalPerformance\` 欄位。】\n\n針對以下賽事，進行4個智能體：\n\n「${message}」\n\n${historyContext}\n\n請以繁體中文對答，並務必輸出符合格式的 JSON：\n${SINGLE_JSON_SAMPLE_INSTRUCTION}`;
+          const messages = [
+            { role: "system", content: systemInstruction },
+            { role: "user", content: userMessage }
+          ];
+          const resText = await queryMistralAI(messages, alt.model, true);
+          let cleaned = resText.trim();
+          if (cleaned.startsWith("```")) {
+            cleaned = cleaned.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+          }
+          finalPayload = JSON.parse(cleaned);
+          finalPayload.groundingSources = [
+            { title: "⚠️ 偵測到您選擇的 analysis 模型額度用完，系統已無縫切換至 [Mistral AI 大模型] 竭誠為您解答！", url: "#" }
+          ];
+          substitutionSuccess = true;
+          fallbackSignature = "Mistral AI";
           break;
         } else if (alt.provider === "zhipu") {
           const systemInstruction = SYSTEM_INSTRUCTION;

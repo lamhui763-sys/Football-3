@@ -865,23 +865,56 @@ export default function App() {
     } : null;
 
     try {
-      const response = await fetch("/api/match-forecast", {
+      const finalProvider = isVercel ? "mistral" : analysisProvider;
+      const finalModel = isVercel ? "mistral-large-latest" : analysisModel;
+
+      let response = await fetch("/api/match-forecast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           message: queryText,
           historicalData: historicalDataPayload,
-          provider: analysisProvider,
-          model: analysisModel
+          provider: finalProvider,
+          model: finalModel
         }),
       });
 
+      let data: PredictionData;
+
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `伺服器響應錯誤 (${response.status})`);
-      }
+        
+        // Fallback mechanism: prioritize 'mistral' specifically if the server response/headers or environment indicates Vercel host
+        const isVercelDetected = isVercel || errData.isVercel || response.headers.get("x-vercel-id") || String(errData.error).toLowerCase().includes("vercel");
+        
+        if (isVercelDetected && finalProvider !== "mistral") {
+          console.warn("Vercel host detected in error response, retrying and falling back to Mistral AI provider...");
+          setIsVercel(true);
+          setAnalysisProvider("mistral");
+          setAnalysisModel("mistral-large-latest");
 
-      const data: PredictionData = await response.json();
+          const retryResponse = await fetch("/api/match-forecast", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: queryText,
+              historicalData: historicalDataPayload,
+              provider: "mistral",
+              model: "mistral-large-latest"
+            }),
+          });
+
+          if (!retryResponse.ok) {
+            const retryErrData = await retryResponse.json().catch(() => ({}));
+            throw new Error(retryErrData.error || `伺服器響應錯誤 (${retryResponse.status})`);
+          }
+          data = await retryResponse.json();
+        } else {
+          throw new Error(errData.error || `伺服器響應錯誤 (${response.status})`);
+        }
+      } else {
+        data = await response.json();
+      }
 
       // Inject local configured historical data so it is guaranteed to display locally!
       if (!data.historicalPerformance && homeTeamObj && awayTeamObj) {
