@@ -1039,21 +1039,41 @@ async function executeHybridMultiAgentForecast(message: string, historyContext: 
 
 app.post("/api/match-forecast", async (req, res) => {
     const { message, historicalData, provider, model } = req.body;
-    let selectedProvider = provider || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" ? "gemini" : "zhipu");
-    let activeModel = model;
+    
+    const hasGeminiKey = process.env.GEMINI_API_KEY && 
+                         process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" && 
+                         process.env.GEMINI_API_KEY.trim() !== "";
+    const hasMistralKey = process.env.MISTRAL_API_KEY && 
+                          process.env.MISTRAL_API_KEY !== "MY_MISTRAL_API_KEY" && 
+                          process.env.MISTRAL_API_KEY.trim() !== "";
+
+    let selectedProvider = provider;
+    if (!selectedProvider) {
+      if (hasGeminiKey) {
+        selectedProvider = "gemini";
+      } else if (hasMistralKey) {
+        selectedProvider = "mistral";
+      } else {
+        selectedProvider = "zhipu";
+      }
+    }
 
     const isVercel = process.env.VERCEL === "1";
-    if (isVercel) {
-      console.log("Vercel deployment environment detected. Forcing Mistral AI (free tier) as selected provider.");
-      selectedProvider = "mistral";
-      activeModel = "mistral-large-latest";
+    let activeModel = model;
+
+    if (selectedProvider === "gemini") {
+      activeModel = activeModel || (isVercel ? "gemini-1.5-flash" : "gemini-1.5-pro");
+      if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
+        activeModel = isVercel ? "gemini-1.5-flash" : "gemini-1.5-pro";
+      }
+    } else if (selectedProvider === "mistral") {
+      activeModel = activeModel || (isVercel ? "mistral-small-latest" : "mistral-large-latest");
+    } else if (selectedProvider === "zhipu") {
+      activeModel = activeModel || "glm-4-flash";
+    } else {
+      activeModel = activeModel || (isVercel ? "gemini-1.5-flash" : "gemini-1.5-pro");
     }
 
-    if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
-      console.log(`DEBUG: Mapping unsupported model ${activeModel} to gemini-1.5-pro`);
-      activeModel = "gemini-1.5-pro";
-    }
-    activeModel = activeModel || (selectedProvider === "zhipu" ? "glm-4-flash" : selectedProvider === "mistral" ? "mistral-large-latest" : "gemini-1.5-pro");
     let historyContext = "";
 
   try {
@@ -1532,8 +1552,8 @@ app.post("/api/match-forecast", async (req, res) => {
     
     // Auto-substitution pool
     const substitutionPool = [
-      { provider: "mistral", model: "mistral-large-latest" },
-      { provider: "gemini", model: "gemini-1.5-pro" },
+      { provider: "mistral", model: isVercel ? "mistral-small-latest" : "mistral-large-latest" },
+      { provider: "gemini", model: isVercel ? "gemini-1.5-flash" : "gemini-1.5-pro" },
       { provider: "dashscope", model: "qwen-plus" },
       { provider: "zhipu", model: "glm-4-flash" }
     ];
@@ -1705,21 +1725,39 @@ app.post("/api/simulate", async (req, res) => {
     const aTeam = awayTeam || "巴塞隆納";
     const topic = focusTopic || "標準強強聯賽交鋒";
 
-    let selectedProvider = provider || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" ? "gemini" : "zhipu");
-    let activeModel = model;
+    const hasGeminiKey = process.env.GEMINI_API_KEY && 
+                         process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" && 
+                         process.env.GEMINI_API_KEY.trim() !== "";
+    const hasMistralKey = process.env.MISTRAL_API_KEY && 
+                          process.env.MISTRAL_API_KEY !== "MY_MISTRAL_API_KEY" && 
+                          process.env.MISTRAL_API_KEY.trim() !== "";
+
+    let selectedProvider = provider;
+    if (!selectedProvider) {
+      if (hasGeminiKey) {
+        selectedProvider = "gemini";
+      } else if (hasMistralKey) {
+        selectedProvider = "mistral";
+      } else {
+        selectedProvider = "zhipu";
+      }
+    }
 
     const isVercel = process.env.VERCEL === "1";
-    if (isVercel) {
-      console.log("Vercel deployment environment detected. Forcing Mistral AI (free tier) as selected provider in simulation.");
-      selectedProvider = "mistral";
-      activeModel = "mistral-large-latest";
-    }
+    let activeModel = model;
 
-    if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
-      console.log(`DEBUG: Mapping unsupported model ${activeModel} to gemini-1.5-flash`);
-      activeModel = "gemini-1.5-flash";
+    if (selectedProvider === "gemini") {
+      activeModel = activeModel || "gemini-1.5-flash";
+      if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
+        activeModel = "gemini-1.5-flash";
+      }
+    } else if (selectedProvider === "mistral") {
+      activeModel = activeModel || (isVercel ? "mistral-small-latest" : "mistral-large-latest");
+    } else if (selectedProvider === "zhipu") {
+      activeModel = activeModel || "glm-4-flash";
+    } else {
+      activeModel = activeModel || "gemini-1.5-flash";
     }
-    activeModel = activeModel || (selectedProvider === "zhipu" ? "glm-4-flash" : "gemini-1.5-flash");
 
   try {
     let simData: any = {};
