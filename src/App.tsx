@@ -424,6 +424,7 @@ export default function App() {
   const [mainTab, setMainTab] = useState<"predict" | "simulate">("predict");
   const [analysisProvider, setAnalysisProvider] = useState<"gemini" | "zhipu" | "local" | "dashscope" | "hybrid" | "mistral">("hybrid");
   const [analysisModel, setAnalysisModel] = useState<string>("qwen-plus");
+  const [isVercel, setIsVercel] = useState(false);
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState(0);
@@ -491,6 +492,23 @@ export default function App() {
 
   useEffect(() => {
     fetchFeedbackStats();
+
+    const checkApiStatus = async () => {
+      try {
+        const res = await fetch("/api/api-status");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.isVercel) {
+            setIsVercel(true);
+            setAnalysisProvider("mistral");
+            setAnalysisModel("mistral-large-latest");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch API status on mount:", err);
+      }
+    };
+    checkApiStatus();
   }, []);
 
   // When prediction changes, reset feedback success state and fields

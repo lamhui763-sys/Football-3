@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Sparkles } from 'lucide-react';
 
 export const ApiKeyDiagnostic: React.FC = () => {
-  const [status, setStatus] = useState<{ gemini: boolean; zhipu: boolean; dashscope: boolean } | null>(null);
+  const [status, setStatus] = useState<{ gemini: boolean; zhipu: boolean; dashscope: boolean; isVercel?: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const check = async () => {
@@ -22,7 +22,24 @@ export const ApiKeyDiagnostic: React.FC = () => {
     check(); 
   }, []);
 
-  if (loading || !status || (status.gemini && status.zhipu && status.dashscope)) {
+  if (loading || !status) {
+    return null;
+  }
+
+  if (status.isVercel) {
+    return (
+      <div className="p-4 bg-emerald-950/20 border border-emerald-900/40 rounded-lg text-emerald-200 text-xs my-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Sparkles size={14} className="text-emerald-400 shrink-0 animate-pulse" />
+          <span>
+            <strong>Vercel 部署環境已激活：</strong> 系統已自動切換為 <strong>Mistral AI (免費高速通道)</strong>，無需配置 Gemini 金鑰，盡享免限流極速分析！
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (status.gemini && status.zhipu && status.dashscope) {
     return null;
   }
 

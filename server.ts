@@ -47,7 +47,8 @@ app.get("/api/api-status", (req, res) => {
       dashscope: hasDashScopeEnv || true, // Has built-in fallback
       dashscopeIsFallback: !hasDashScopeEnv,
       mistral: hasMistral || true,
-      mistralIsFallback: !hasMistral
+      mistralIsFallback: !hasMistral,
+      isVercel: process.env.VERCEL === "1"
     });
   } catch (err) {
     console.error("Error in api-status endpoint:", err);
@@ -56,7 +57,8 @@ app.get("/api/api-status", (req, res) => {
       zhipu: true,
       zhipuIsFallback: true,
       dashscope: true,
-      dashscopeIsFallback: true
+      dashscopeIsFallback: true,
+      isVercel: process.env.VERCEL === "1"
     });
   }
 });
