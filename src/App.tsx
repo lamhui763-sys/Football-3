@@ -906,11 +906,11 @@ export default function App() {
 
           if (!retryResponse.ok) {
             const retryErrData = await retryResponse.json().catch(() => ({}));
-            throw new Error(retryErrData.error || `伺服器響應錯誤 (${retryResponse.status})`);
+            throw new Error(retryErrData.error || retryErrData.message || `伺服器響應錯誤 (${retryResponse.status})`);
           }
           data = await retryResponse.json();
         } else {
-          throw new Error(errData.error || `伺服器響應錯誤 (${response.status})`);
+          throw new Error(errData.error || errData.message || `伺服器響應錯誤 (${response.status})`);
         }
       } else {
         data = await response.json();
