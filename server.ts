@@ -797,13 +797,16 @@ async function querySingleStageWithCascade(
   primaryModel: string,
   historyContext: string
 ): Promise<any> {
-  const cascadeOrder = [
-    { provider: primaryProvider, model: primaryModel },
-    { provider: "dashscope", model: "qwen-plus" },
-    { provider: "zhipu", model: "glm-4-flash" },
-    { provider: "gemini", model: "gemini-1.5-pro" },
-    { provider: "mistral", model: "mistral-large-latest" }
-  ];
+  const isVercel = process.env.VERCEL === "1";
+  const cascadeOrder = isVercel
+    ? [ { provider: "mistral", model: "mistral-large-latest" } ]
+    : [
+        { provider: primaryProvider, model: primaryModel },
+        { provider: "dashscope", model: "qwen-plus" },
+        { provider: "zhipu", model: "glm-4-flash" },
+        { provider: "gemini", model: "gemini-1.5-pro" },
+        { provider: "mistral", model: "mistral-large-latest" }
+      ];
 
   const seen = new Set<string>();
   const uniquePool: { provider: string; model: string }[] = [];
@@ -1036,6 +1039,14 @@ app.post("/api/match-forecast", async (req, res) => {
     const { message, historicalData, provider, model } = req.body;
     let selectedProvider = provider || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" ? "gemini" : "zhipu");
     let activeModel = model;
+
+    const isVercel = process.env.VERCEL === "1";
+    if (isVercel) {
+      console.log("Vercel deployment environment detected. Forcing Mistral AI (free tier) as selected provider.");
+      selectedProvider = "mistral";
+      activeModel = "mistral-large-latest";
+    }
+
     if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
       console.log(`DEBUG: Mapping unsupported model ${activeModel} to gemini-1.5-pro`);
       activeModel = "gemini-1.5-pro";
@@ -1658,6 +1669,14 @@ app.post("/api/simulate", async (req, res) => {
 
     let selectedProvider = provider || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "" && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY" ? "gemini" : "zhipu");
     let activeModel = model;
+
+    const isVercel = process.env.VERCEL === "1";
+    if (isVercel) {
+      console.log("Vercel deployment environment detected. Forcing Mistral AI (free tier) as selected provider in simulation.");
+      selectedProvider = "mistral";
+      activeModel = "mistral-large-latest";
+    }
+
     if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
       console.log(`DEBUG: Mapping unsupported model ${activeModel} to gemini-1.5-flash`);
       activeModel = "gemini-1.5-flash";
@@ -1754,6 +1773,49 @@ app.post("/api/simulate", async (req, res) => {
       ];
 
       const resText = await queryDashScope(dashMessages, activeModel, true);
+      let cleanedText = resText.trim();
+      if (cleanedText.startsWith("```")) {
+        cleanedText = cleanedText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+      }
+      simData = JSON.parse(cleanedText);
+    } else if (selectedProvider === "mistral") {
+      const userContent = `請模擬 "${hTeam}" (代表: Agent 2 攻勢) 與 "${aTeam}" (代表: Agent 3 防反/質疑) 的整場精彩比賽。主題設定為: "${topic}"。
+請生成完備的上下半場每一分鐘與關鍵分鐘的文字直播記錄！
+請以繁體中文（廣東話/台灣體育解說混搭風格）回答，且必須輸出符合以下 JSON 格式的純 JSON 對象：
+{
+  "simulationMeta": {
+    "homeTeam": "${hTeam}",
+    "awayTeam": "${aTeam}",
+    "stadium": "智能戰術沙盤體育場",
+    "refereeName": "Agent 1 (即時直播裁判官)",
+    "finalScore": "總比分如 2 - 1",
+    "totalShotsHome": 14,
+    "totalShotsAway": 10,
+    "possessionHome": 55,
+    "possessionAway": 45
+  },
+  "timeline": [
+    {
+      "minute": 1,
+      "half": "first",
+      "speaker": "Agent 1",
+      "speakerName": "Agent 1 (主裁判兼主播)",
+      "type": "kickoff",
+      "title": "大戰開球",
+      "content": "文字直播台詞",
+      "currentHomeScore": 0,
+      "currentAwayScore": 0
+    }
+  ]
+}
+請確保 timeline 包含至少 12 個關鍵賽事時間節點的分佈。`;
+
+      const mistralMessages = [
+        { role: "system", content: SIMULATOR_SYSTEM_INSTRUCTION },
+        { role: "user", content: userContent }
+      ];
+
+      const resText = await queryMistralAI(mistralMessages, activeModel, true);
       let cleanedText = resText.trim();
       if (cleanedText.startsWith("```")) {
         cleanedText = cleanedText.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
