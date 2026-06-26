@@ -1062,16 +1062,16 @@ app.post("/api/match-forecast", async (req, res) => {
     let activeModel = model;
 
     if (selectedProvider === "gemini") {
-      activeModel = activeModel || (isVercel ? "gemini-1.5-flash" : "gemini-1.5-pro");
+      activeModel = isVercel ? "gemini-1.5-flash" : (activeModel || "gemini-1.5-pro");
       if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
         activeModel = isVercel ? "gemini-1.5-flash" : "gemini-1.5-pro";
       }
     } else if (selectedProvider === "mistral") {
-      activeModel = activeModel || (isVercel ? "mistral-small-latest" : "mistral-large-latest");
+      activeModel = isVercel ? "mistral-small-latest" : (activeModel || "mistral-large-latest");
     } else if (selectedProvider === "zhipu") {
       activeModel = activeModel || "glm-4-flash";
     } else {
-      activeModel = activeModel || (isVercel ? "gemini-1.5-flash" : "gemini-1.5-pro");
+      activeModel = isVercel ? "gemini-1.5-flash" : (activeModel || "gemini-1.5-pro");
     }
 
     let historyContext = "";
@@ -1747,16 +1747,16 @@ app.post("/api/simulate", async (req, res) => {
     let activeModel = model;
 
     if (selectedProvider === "gemini") {
-      activeModel = activeModel || "gemini-1.5-flash";
+      activeModel = isVercel ? "gemini-1.5-flash" : (activeModel || "gemini-1.5-flash");
       if (activeModel && activeModel.startsWith("gemini-") && !["gemini-1.5-pro", "gemini-1.5-flash"].includes(activeModel)) {
         activeModel = "gemini-1.5-flash";
       }
     } else if (selectedProvider === "mistral") {
-      activeModel = activeModel || (isVercel ? "mistral-small-latest" : "mistral-large-latest");
+      activeModel = isVercel ? "mistral-small-latest" : (activeModel || "mistral-large-latest");
     } else if (selectedProvider === "zhipu") {
       activeModel = activeModel || "glm-4-flash";
     } else {
-      activeModel = activeModel || "gemini-1.5-flash";
+      activeModel = isVercel ? "gemini-1.5-flash" : (activeModel || "gemini-1.5-flash");
     }
 
   try {

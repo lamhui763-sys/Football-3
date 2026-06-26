@@ -501,7 +501,7 @@ export default function App() {
           if (data.isVercel) {
             setIsVercel(true);
             setAnalysisProvider("mistral");
-            setAnalysisModel("mistral-large-latest");
+            setAnalysisModel("mistral-small-latest");
           }
         }
       } catch (err) {
@@ -866,7 +866,7 @@ export default function App() {
 
     try {
       const finalProvider = isVercel ? "mistral" : analysisProvider;
-      const finalModel = isVercel ? "mistral-large-latest" : analysisModel;
+      const finalModel = isVercel ? "mistral-small-latest" : analysisModel;
 
       let response = await fetch("/api/match-forecast", {
         method: "POST",
@@ -891,7 +891,7 @@ export default function App() {
           console.warn("Vercel host detected in error response, retrying and falling back to Mistral AI provider...");
           setIsVercel(true);
           setAnalysisProvider("mistral");
-          setAnalysisModel("mistral-large-latest");
+          setAnalysisModel("mistral-small-latest");
 
           const retryResponse = await fetch("/api/match-forecast", {
             method: "POST",
@@ -900,7 +900,7 @@ export default function App() {
               message: queryText,
               historicalData: historicalDataPayload,
               provider: "mistral",
-              model: "mistral-large-latest"
+              model: "mistral-small-latest"
             }),
           });
 
